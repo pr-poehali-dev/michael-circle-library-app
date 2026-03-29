@@ -4,89 +4,61 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 28 25% 8%;
+    --foreground: 38 60% 88%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 28 20% 12%;
+    --card-foreground: 38 60% 88%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 28 20% 12%;
+    --popover-foreground: 38 60% 88%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 38 85% 58%;
+    --primary-foreground: 28 30% 8%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 28 20% 18%;
+    --secondary-foreground: 38 60% 88%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 28 15% 16%;
+    --muted-foreground: 38 25% 55%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 18 70% 45%;
+    --accent-foreground: 38 60% 92%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 38 60% 92%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 28 20% 20%;
+    --input: 28 20% 18%;
+    --ring: 38 85% 58%;
 
-    --radius: 0.5rem;
+    --radius: 2px;
 
-    --sidebar-background: 0 0% 98%;
+    /* Ретро-палитра */
+    --amber: #d4a843;
+    --amber-dark: #a07820;
+    --amber-light: #f2c96a;
+    --wood-dark: #1a1008;
+    --wood-mid: #2c1f0e;
+    --wood-light: #3d2b14;
+    --cream: #f5e6c8;
+    --cream-dark: #d4c4a0;
+    --tape-brown: #4a2e1a;
+    --tape-dark: #2a1a0a;
+    --metal: #8a8070;
+    --metal-light: #b0a898;
+    --red-accent: #c0392b;
+    --green-led: #4caf50;
+    --vu-yellow: #f5c518;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 28 25% 8%;
+    --sidebar-foreground: 38 60% 88%;
+    --sidebar-primary: 38 85% 58%;
+    --sidebar-primary-foreground: 28 30% 8%;
+    --sidebar-accent: 28 20% 18%;
+    --sidebar-accent-foreground: 38 60% 88%;
+    --sidebar-border: 28 20% 20%;
+    --sidebar-ring: 38 85% 58%;
   }
 }
 
@@ -97,5 +69,376 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: "Oswald", sans-serif;
+    background-color: var(--wood-dark);
+    overflow-x: hidden;
   }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--wood-dark);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--amber-dark);
+    border-radius: 0;
+  }
+}
+
+/* Текстуры */
+.wood-texture {
+  background-color: var(--wood-mid);
+  background-image:
+    repeating-linear-gradient(
+      92deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.08) 2px,
+      rgba(0, 0, 0, 0.08) 3px
+    ),
+    repeating-linear-gradient(
+      178deg,
+      transparent,
+      transparent 12px,
+      rgba(212, 168, 67, 0.04) 12px,
+      rgba(212, 168, 67, 0.04) 13px
+    );
+}
+
+.shelf-texture {
+  background: linear-gradient(
+    180deg,
+    var(--wood-light) 0%,
+    var(--wood-mid) 30%,
+    #1e1206 70%,
+    #0f0a03 100%
+  );
+  box-shadow:
+    inset 0 -4px 8px rgba(0, 0, 0, 0.6),
+    inset 0 2px 4px rgba(212, 168, 67, 0.1);
+}
+
+.tape-texture {
+  background: linear-gradient(
+    135deg,
+    #3a2210 0%,
+    #2a1808 40%,
+    #3d2510 70%,
+    #1a0e04 100%
+  );
+}
+
+.cd-texture {
+  background: linear-gradient(
+    135deg,
+    #1a1a2e 0%,
+    #16213e 40%,
+    #0f3460 70%,
+    #1a1a2e 100%
+  );
+}
+
+.metal-texture {
+  background: linear-gradient(
+    180deg,
+    #9a908a 0%,
+    #6a6060 30%,
+    #8a8070 60%,
+    #5a5050 100%
+  );
+}
+
+/* Зернистость плёнки */
+.grain-overlay::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* LED дисплей */
+.led-text {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--amber-light);
+  text-shadow:
+    0 0 8px rgba(212, 168, 67, 0.8),
+    0 0 20px rgba(212, 168, 67, 0.4);
+  letter-spacing: 0.1em;
+}
+
+.led-display {
+  background: #0a0a00;
+  border: 1px solid #2a2a00;
+  box-shadow:
+    inset 0 0 12px rgba(0, 0, 0, 0.8),
+    0 0 4px rgba(212, 168, 67, 0.2);
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--amber-light);
+}
+
+/* VU-метр */
+.vu-bar {
+  background: linear-gradient(
+    to top,
+    #4caf50 0%,
+    #8bc34a 40%,
+    #f5c518 65%,
+    #ff5722 85%,
+    #f44336 100%
+  );
+}
+
+/* Кнопки в стиле ретро */
+.retro-btn {
+  background: linear-gradient(
+    180deg,
+    var(--metal-light) 0%,
+    var(--metal) 50%,
+    #6a6060 100%
+  );
+  border: 1px solid #3a3030;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  color: var(--wood-dark);
+  font-family: "Oswald", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.1s;
+}
+.retro-btn:active {
+  box-shadow:
+    0 0 2px rgba(0, 0, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  transform: translateY(1px);
+}
+.retro-btn:hover {
+  background: linear-gradient(
+    180deg,
+    #c8c0b8 0%,
+    var(--metal-light) 50%,
+    var(--metal) 100%
+  );
+}
+
+/* Анимации */
+@keyframes spin-reel {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spin-cd {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+@keyframes blink-led {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+@keyframes vu-pulse {
+  0%,
+  100% {
+    height: 20%;
+  }
+  50% {
+    height: var(--vu-height, 60%);
+  }
+}
+@keyframes slide-up {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes flip-in {
+  from {
+    transform: rotateY(90deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+}
+@keyframes cassette-pull {
+  from {
+    transform: translateX(0) scale(1);
+  }
+  to {
+    transform: translateX(20px) scale(1.05);
+  }
+}
+@keyframes tape-wobble {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.98);
+  }
+}
+@keyframes glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(212, 168, 67, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 16px rgba(212, 168, 67, 0.8),
+      0 0 32px rgba(212, 168, 67, 0.3);
+  }
+}
+@keyframes needle-bounce {
+  0%,
+  100% {
+    transform: rotate(-30deg);
+  }
+  50% {
+    transform: rotate(var(--needle-angle, 15deg));
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes scale-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes slide-right {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-spin-reel {
+  animation: spin-reel 2s linear infinite;
+}
+.animate-spin-cd {
+  animation: spin-cd 3s linear infinite;
+}
+.animate-marquee {
+  animation: marquee 12s linear infinite;
+}
+.animate-blink {
+  animation: blink-led 1s ease-in-out infinite;
+}
+.animate-glow {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+}
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+.animate-slide-right {
+  animation: slide-right 0.3s ease-out forwards;
+}
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+.animate-needle {
+  animation: needle-bounce 1.5s ease-in-out infinite;
+}
+
+.spin-paused {
+  animation-play-state: paused;
+}
+
+/* Полка */
+.shelf-edge {
+  background: linear-gradient(180deg, #5a4020 0%, #3d2b14 40%, #2c1f0e 100%);
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.8),
+    inset 0 1px 2px rgba(212, 168, 67, 0.15);
+}
+
+/* Коробка кассеты — торец */
+.cassette-spine {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+}
+
+/* Jewel-case переворот */
+.flip-card {
+  perspective: 1000px;
+}
+.flip-card-inner {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+  position: relative;
+}
+.flip-card-inner.flipped {
+  transform: rotateY(180deg);
+}
+.flip-card-front,
+.flip-card-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-card-back {
+  transform: rotateY(180deg);
+}
+
+/* Скоч-лента эффект */
+.tape-line {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 3px,
+    rgba(212, 168, 67, 0.08) 3px,
+    rgba(212, 168, 67, 0.08) 4px
+  );
 }
