@@ -15,8 +15,28 @@ export default function App() {
   const [sortBy, setSortBy] = useState<SortType>('year');
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installed, setInstalled] = useState(false);
 
   const audio = useAudio();
+
+  // PWA install prompt
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handler = (e: any) => { e.preventDefault(); setInstallPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setInstalled(true));
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPrompt) return;
+    installPrompt.prompt();
+    const { outcome } = await installPrompt.userChoice;
+    if (outcome === 'accepted') setInstalled(true);
+    setInstallPrompt(null);
+  };
 
   const openAlbum = (album: Album) => {
     setSelectedAlbum(album);
@@ -87,8 +107,17 @@ export default function App() {
             {screen === 'tapecenter' && '◼ КАССЕТНЫЙ ЦЕНТР'}
           </div>
         </div>
-        <div className="w-16 flex justify-end gap-2">
-          {screen === 'shelf' && (
+        <div className="w-16 flex justify-end gap-2 items-center">
+          {!installed && installPrompt && (
+            <button onClick={handleInstall}
+              className="flex items-center gap-1 px-2 py-1 rounded-sm font-mono text-[9px] tracking-wider animate-glow"
+              style={{ background: 'var(--amber)', color: 'var(--wood-dark)', border: '1px solid var(--amber-light)' }}
+              title="Установить как приложение">
+              <Icon name="Download" size={10} />
+              APK
+            </button>
+          )}
+          {screen === 'shelf' && !installPrompt && (
             <>
               <button onClick={() => setScreen('search')} className="transition-colors" style={{ color: 'var(--amber-dark)' }}>
                 <Icon name="Search" size={18} />
@@ -97,6 +126,11 @@ export default function App() {
                 <Icon name="BookOpen" size={18} />
               </button>
             </>
+          )}
+          {screen === 'shelf' && installPrompt && (
+            <button onClick={() => setScreen('search')} className="transition-colors" style={{ color: 'var(--amber-dark)' }}>
+              <Icon name="Search" size={18} />
+            </button>
           )}
         </div>
       </header>
