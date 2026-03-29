@@ -115,6 +115,7 @@ export default function App() {
           album={selectedAlbum}
           isFlipped={isFlipped}
           favorites={favorites}
+          audio={audio}
           onFlip={() => setIsFlipped(f => !f)}
           onPlay={() => openPlayer(selectedAlbum)}
           onPlayTrack={(track) => openPlayer(selectedAlbum, track)}
@@ -316,15 +317,29 @@ function SpineItem({ album, isFavorite, delay, onSelect, onToggleFavorite }: {
   );
 }
 
-function AlbumScreen({ album, isFlipped, favorites, onFlip, onPlay, onPlayTrack, onToggleFavorite }: {
+function AlbumScreen({ album, isFlipped, favorites, audio, onFlip, onPlay, onPlayTrack, onToggleFavorite }: {
   album: Album;
   isFlipped: boolean;
   favorites: Set<string>;
+  audio: ReturnType<typeof useAudio>;
   onFlip: () => void;
   onPlay: () => void;
   onPlayTrack: (t: Track) => void;
   onToggleFavorite: (id: string) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loadMsg, setLoadMsg] = useState('');
+
+  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const matched = audio.loadFiles(e.target.files, album.id, album.tracks);
+    setLoadMsg(`✓ Загружено ${matched} из ${e.target.files.length} файлов`);
+    setTimeout(() => setLoadMsg(''), 3500);
+    e.target.value = '';
+  };
+
+  const loadedCount = album.tracks.filter(t => audio.hasFile(`${album.id}-${t.id}`)).length;
+
   return (
     <div className="pb-24 animate-fade-in">
       <div className="px-6 py-6">
@@ -411,6 +426,48 @@ function AlbumScreen({ album, isFlipped, favorites, onFlip, onPlay, onPlayTrack,
             <Icon name="Heart" size={14} style={{ color: favorites.has(album.id) ? '#C0392B' : 'var(--wood-dark)' }} />
           </button>
         </div>
+
+        {/* Upload block */}
+        <input ref={fileInputRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleFiles} />
+        <div className="mt-4">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-sm transition-all"
+            style={{
+              background: loadedCount > 0 ? 'rgba(76,175,80,0.08)' : 'rgba(212,168,67,0.06)',
+              border: `1px dashed ${loadedCount > 0 ? 'rgba(76,175,80,0.4)' : 'rgba(212,168,67,0.25)'}`,
+            }}>
+            <div className="flex items-center gap-2">
+              <Icon name={loadedCount > 0 ? 'Music' : 'FolderOpen'} size={14}
+                style={{ color: loadedCount > 0 ? '#4CAF50' : 'var(--amber-dark)' }} />
+              <span className="font-mono text-xs" style={{ color: loadedCount > 0 ? '#4CAF50' : 'var(--amber-dark)' }}>
+                {loadedCount > 0
+                  ? `ЗАГРУЖЕНО ${loadedCount} / ${album.tracks.length} ТРЕКОВ`
+                  : 'ЗАГРУЗИТЬ MP3-ФАЙЛЫ АЛЬБОМА'}
+              </span>
+            </div>
+            <span className="font-mono text-xs px-2 py-0.5 rounded-sm"
+              style={{
+                background: loadedCount > 0 ? 'rgba(76,175,80,0.2)' : 'var(--wood-light)',
+                color: loadedCount > 0 ? '#4CAF50' : 'var(--amber-dark)',
+                border: `1px solid ${loadedCount > 0 ? 'rgba(76,175,80,0.3)' : 'rgba(212,168,67,0.15)'}`,
+              }}>
+              {loadedCount > 0 ? 'ДОБАВИТЬ ЕЩЁ' : 'ВЫБРАТЬ'}
+            </span>
+          </button>
+          {loadMsg && (
+            <div className="mt-2 font-mono text-xs text-center animate-fade-in"
+              style={{ color: '#4CAF50' }}>
+              {loadMsg}
+            </div>
+          )}
+          {loadedCount === 0 && (
+            <div className="mt-1 font-mono text-[10px] text-center leading-relaxed"
+              style={{ color: 'rgba(212,168,67,0.35)' }}>
+              Файлы сопоставляются по названию трека или номеру (01.mp3, Владимирский централ.mp3)
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="px-4 mb-4">
@@ -437,6 +494,7 @@ function AlbumScreen({ album, isFlipped, favorites, onFlip, onPlay, onPlayTrack,
             index={i + 1}
             delay={i * 0.04}
             isFavorite={favorites.has(`${album.id}-${track.id}`)}
+            hasAudio={audio.hasFile(`${album.id}-${track.id}`)}
             onPlay={() => onPlayTrack(track)}
             onToggleFavorite={() => onToggleFavorite(`${album.id}-${track.id}`)}
           />
@@ -446,11 +504,12 @@ function AlbumScreen({ album, isFlipped, favorites, onFlip, onPlay, onPlayTrack,
   );
 }
 
-function TrackRow({ track, index, delay, isFavorite, onPlay, onToggleFavorite }: {
+function TrackRow({ track, index, delay, isFavorite, hasAudio, onPlay, onToggleFavorite }: {
   track: Track;
   index: number;
   delay: number;
   isFavorite: boolean;
+  hasAudio?: boolean;
   onPlay: () => void;
   onToggleFavorite: () => void;
 }) {
@@ -478,6 +537,9 @@ function TrackRow({ track, index, delay, isFavorite, onPlay, onToggleFavorite }:
       <div className="flex-1 font-oswald text-sm tracking-wide" style={{ color: 'var(--cream)' }} onClick={onPlay}>
         {track.title}
       </div>
+      {hasAudio && (
+        <div title="MP3 загружен" style={{ width: 6, height: 6, borderRadius: '50%', background: '#4CAF50', boxShadow: '0 0 4px #4CAF50', flexShrink: 0 }} />
+      )}
       <button onClick={onToggleFavorite} style={{ opacity: isFavorite || hovered ? 1 : 0, transition: 'opacity 0.2s' }}>
         <Icon name="Heart" size={12} style={{ color: isFavorite ? '#C0392B' : 'var(--amber-dark)' }} />
       </button>
