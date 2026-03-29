@@ -4,7 +4,7 @@ import { albums, biography, type Album, type Track } from '@/data/albums';
 import Icon from '@/components/ui/icon';
 import { useAudio } from '@/hooks/useAudio';
 
-type Screen = 'shelf' | 'album' | 'player' | 'search' | 'history';
+type Screen = 'shelf' | 'album' | 'player' | 'search' | 'history' | 'cdcenter';
 type SortType = 'year' | 'type' | 'category';
 
 export default function App() {
@@ -83,6 +83,7 @@ export default function App() {
             {screen === 'player' && '▶ ПЛЕЕР'}
             {screen === 'search' && '⌕ ПОИСК'}
             {screen === 'history' && '✦ БИОГРАФИЯ'}
+            {screen === 'cdcenter' && '◉ CD МП3-ЦЕНТР'}
           </div>
         </div>
         <div className="w-16 flex justify-end gap-2">
@@ -164,12 +165,22 @@ export default function App() {
         <HistoryScreen albums={albums} onSelectAlbum={openAlbum} />
       )}
 
+      {screen === 'cdcenter' && (
+        <CDCenterScreen
+          albums={albums.filter(a => a.type === 'cd')}
+          audio={audio}
+          onSelectAlbum={openAlbum}
+          onPlayAlbum={(album) => openPlayer(album)}
+        />
+      )}
+
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-sm z-50"
         style={{ background: 'linear-gradient(0deg, #0f0a03 0%, #1a1008 100%)', borderTop: '1px solid var(--amber-dark)' }}>
         <div className="flex">
           {[
             { id: 'shelf', icon: 'Library', label: 'СТЕЛЛАЖ' },
+            { id: 'cdcenter', icon: 'Disc3', label: 'CD ЦЕНТР' },
             { id: 'search', icon: 'Search', label: 'ПОИСК' },
             { id: 'history', icon: 'BookOpen', label: 'ИСТОРИЯ' },
           ].map(tab => (
@@ -937,6 +948,227 @@ function SearchScreen({ query, results, onQueryChange, onSelectAlbum, onPlayTrac
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function CDCenterScreen({ albums, audio, onSelectAlbum, onPlayAlbum }: {
+  albums: Album[];
+  audio: ReturnType<typeof useAudio>;
+  onSelectAlbum: (a: Album) => void;
+  onPlayAlbum: (a: Album) => void;
+}) {
+  const totalTracks = albums.reduce((s, a) => s + a.tracks.length, 0);
+  const loadedTracks = albums.reduce((s, a) =>
+    s + a.tracks.filter(t => audio.hasFile(`${a.id}-${t.id}`)).length, 0);
+  const overallPct = totalTracks ? Math.round((loadedTracks / totalTracks) * 100) : 0;
+
+  return (
+    <div className="pb-24 animate-fade-in">
+      {/* Header stats */}
+      <div className="px-4 py-4"
+        style={{ background: 'linear-gradient(180deg, #0a0810 0%, #0f0c18 100%)', borderBottom: '1px solid rgba(160,180,220,0.15)' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="text-3xl">💿</div>
+          <div>
+            <div className="font-oswald font-bold text-base tracking-widest" style={{ color: '#A8C8F0' }}>
+              CD MP3-ЦЕНТР
+            </div>
+            <div className="font-mono text-xs" style={{ color: 'rgba(160,180,220,0.5)' }}>
+              {albums.length} дисков · {totalTracks} треков
+            </div>
+          </div>
+          <div className="ml-auto text-right">
+            <div className="font-mono text-xl font-bold" style={{ color: overallPct === 100 ? '#4CAF50' : '#A8C8F0' }}>
+              {overallPct}%
+            </div>
+            <div className="font-mono text-[10px]" style={{ color: 'rgba(160,180,220,0.4)' }}>
+              {loadedTracks}/{totalTracks}
+            </div>
+          </div>
+        </div>
+        {/* Total progress bar */}
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(160,180,220,0.1)' }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${overallPct}%`,
+              background: overallPct === 100
+                ? 'linear-gradient(90deg, #4CAF50, #8BC34A)'
+                : 'linear-gradient(90deg, #1a3a6a, #A8C8F0)',
+            }} />
+        </div>
+      </div>
+
+      {/* CD list */}
+      <div className="px-4 py-3 space-y-3">
+        {albums.map((album, i) => (
+          <CDCenterCard
+            key={album.id}
+            album={album}
+            audio={audio}
+            delay={i * 0.07}
+            onOpen={() => onSelectAlbum(album)}
+            onPlay={() => onPlayAlbum(album)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CDCenterCard({ album, audio, delay, onOpen, onPlay }: {
+  album: Album;
+  audio: ReturnType<typeof useAudio>;
+  delay: number;
+  onOpen: () => void;
+  onPlay: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState('');
+  const loaded = album.tracks.filter(t => audio.hasFile(`${album.id}-${t.id}`)).length;
+  const total = album.tracks.length;
+  const pct = total ? Math.round((loaded / total) * 100) : 0;
+  const allLoaded = loaded === total;
+
+  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const matched = audio.loadFiles(e.target.files, album.id, album.tracks);
+    setToast(`✓ Добавлено ${matched} треков`);
+    setTimeout(() => setToast(''), 3000);
+    e.target.value = '';
+  };
+
+  return (
+    <div className="rounded-sm overflow-hidden animate-fade-in"
+      style={{
+        animationDelay: `${delay}s`,
+        animationFillMode: 'both',
+        background: 'linear-gradient(135deg, #0f0c18 0%, #0a0810 100%)',
+        border: `1px solid ${allLoaded ? 'rgba(76,175,80,0.3)' : 'rgba(160,180,220,0.12)'}`,
+        boxShadow: allLoaded ? '0 0 12px rgba(76,175,80,0.08)' : 'none',
+      }}>
+      <div className="flex items-center gap-3 p-3">
+        {/* CD art */}
+        <div className="relative shrink-0 cursor-pointer" onClick={onOpen}
+          style={{ width: 56, height: 56 }}>
+          <div className="absolute inset-0 rounded-full"
+            style={{
+              background: `conic-gradient(from 0deg, ${album.coverColor}, #0f3460, #533483, ${album.coverColor}, #16213e, ${album.coverColor})`,
+              boxShadow: allLoaded ? '0 0 10px rgba(76,175,80,0.3)' : '0 0 8px rgba(80,60,200,0.25)',
+            }}>
+            <div className="absolute inset-3 rounded-full"
+              style={{ background: 'conic-gradient(from 45deg, rgba(255,100,100,0.08), rgba(255,200,0,0.08), rgba(100,255,100,0.08), rgba(100,100,255,0.08), rgba(255,100,100,0.08))' }} />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#060408', border: '1px solid #1a1828' }} />
+            </div>
+          </div>
+          {allLoaded && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+              style={{ background: '#4CAF50', border: '1px solid #0a0810' }}>
+              <Icon name="Check" size={9} style={{ color: '#fff' }} />
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
+          <div className="font-oswald text-sm font-semibold tracking-wide truncate" style={{ color: '#A8C8F0' }}>
+            {album.title}
+          </div>
+          <div className="font-mono text-[10px] mb-1.5" style={{ color: 'rgba(160,180,220,0.45)' }}>
+            {album.year} · {album.label} · {total} треков
+          </div>
+          {/* Progress bar */}
+          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(160,180,220,0.1)' }}>
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${pct}%`,
+                background: allLoaded
+                  ? 'linear-gradient(90deg, #4CAF50, #8BC34A)'
+                  : 'linear-gradient(90deg, #1a3a6a, #5080c0)',
+              }} />
+          </div>
+          <div className="font-mono text-[9px] mt-0.5" style={{ color: allLoaded ? '#4CAF50' : 'rgba(160,180,220,0.35)' }}>
+            {allLoaded ? 'ВСЕ ТРЕКИ ЗАГРУЖЕНЫ' : `${loaded} / ${total} MP3`}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <button onClick={onPlay}
+            disabled={loaded === 0}
+            className="flex items-center justify-center w-8 h-8 rounded-sm transition-all"
+            style={{
+              background: loaded > 0 ? 'var(--amber)' : 'rgba(160,180,220,0.08)',
+              border: `1px solid ${loaded > 0 ? 'var(--amber-light)' : 'rgba(160,180,220,0.15)'}`,
+              cursor: loaded > 0 ? 'pointer' : 'not-allowed',
+            }}>
+            <Icon name="Play" size={14} style={{ color: loaded > 0 ? 'var(--wood-dark)' : 'rgba(160,180,220,0.25)' }} />
+          </button>
+          <button onClick={() => fileRef.current?.click()}
+            className="flex items-center justify-center w-8 h-8 rounded-sm transition-all"
+            style={{
+              background: allLoaded ? 'rgba(76,175,80,0.15)' : 'rgba(160,180,220,0.08)',
+              border: `1px solid ${allLoaded ? 'rgba(76,175,80,0.4)' : 'rgba(160,180,220,0.15)'}`,
+            }}>
+            <Icon name={allLoaded ? 'FolderCheck' : 'Upload'} size={14}
+              style={{ color: allLoaded ? '#4CAF50' : 'rgba(160,180,220,0.5)' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Tracks list collapsed */}
+      <CDTrackList album={album} audio={audio} />
+
+      {toast && (
+        <div className="px-3 py-1.5 font-mono text-xs animate-fade-in"
+          style={{ background: 'rgba(76,175,80,0.12)', borderTop: '1px solid rgba(76,175,80,0.2)', color: '#4CAF50' }}>
+          {toast}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleFiles} />
+    </div>
+  );
+}
+
+function CDTrackList({ album, audio }: { album: Album; audio: ReturnType<typeof useAudio> }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ borderTop: '1px solid rgba(160,180,220,0.06)' }}>
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-1.5"
+        style={{ background: 'transparent' }}>
+        <span className="font-mono text-[10px] tracking-widest" style={{ color: 'rgba(160,180,220,0.35)' }}>
+          ТРЕКЛИСТ
+        </span>
+        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={12}
+          style={{ color: 'rgba(160,180,220,0.35)' }} />
+      </button>
+      {open && (
+        <div className="px-3 pb-2">
+          {album.tracks.map(t => {
+            const hasFile = audio.hasFile(`${album.id}-${t.id}`);
+            return (
+              <div key={t.id} className="flex items-center gap-2 py-1"
+                style={{ borderBottom: '1px solid rgba(160,180,220,0.05)' }}>
+                <span className="font-mono text-[10px] w-5 shrink-0 text-right"
+                  style={{ color: 'rgba(160,180,220,0.3)' }}>
+                  {String(t.id).padStart(2, '0')}
+                </span>
+                <span className="flex-1 font-oswald text-xs truncate" style={{ color: hasFile ? '#A8C8F0' : 'rgba(160,180,220,0.4)' }}>
+                  {t.title}
+                </span>
+                {hasFile
+                  ? <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#4CAF50', boxShadow: '0 0 4px #4CAF50', flexShrink: 0 }} />
+                  : <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(160,180,220,0.12)', flexShrink: 0 }} />
+                }
+                <span className="font-mono text-[10px] shrink-0" style={{ color: 'rgba(160,180,220,0.3)' }}>{t.duration}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
