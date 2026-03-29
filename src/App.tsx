@@ -105,6 +105,7 @@ export default function App() {
           sortBy={sortBy}
           setSortBy={setSortBy}
           favorites={favorites}
+          audio={audio}
           onSelect={openAlbum}
           onToggleFavorite={toggleFavorite}
         />
@@ -187,11 +188,12 @@ export default function App() {
   );
 }
 
-function ShelfScreen({ albums, sortBy, setSortBy, favorites, onSelect, onToggleFavorite }: {
+function ShelfScreen({ albums, sortBy, setSortBy, favorites, audio, onSelect, onToggleFavorite }: {
   albums: Album[];
   sortBy: string;
   setSortBy: (s: SortType) => void;
   favorites: Set<string>;
+  audio: ReturnType<typeof useAudio>;
   onSelect: (a: Album) => void;
   onToggleFavorite: (id: string) => void;
 }) {
@@ -217,16 +219,17 @@ function ShelfScreen({ albums, sortBy, setSortBy, favorites, onSelect, onToggleF
         ))}
       </div>
 
-      <ShelfRow title="◼ КАССЕТЫ" albums={cassettes} favorites={favorites} onSelect={onSelect} onToggleFavorite={onToggleFavorite} />
-      <ShelfRow title="◉ КОМПАКТ-ДИСКИ" albums={cds} favorites={favorites} onSelect={onSelect} onToggleFavorite={onToggleFavorite} />
+      <ShelfRow title="◼ КАССЕТЫ" albums={cassettes} favorites={favorites} audio={audio} onSelect={onSelect} onToggleFavorite={onToggleFavorite} />
+      <ShelfRow title="◉ КОМПАКТ-ДИСКИ" albums={cds} favorites={favorites} audio={audio} onSelect={onSelect} onToggleFavorite={onToggleFavorite} />
     </div>
   );
 }
 
-function ShelfRow({ title, albums, favorites, onSelect, onToggleFavorite }: {
+function ShelfRow({ title, albums, favorites, audio, onSelect, onToggleFavorite }: {
   title: string;
   albums: Album[];
   favorites: Set<string>;
+  audio: ReturnType<typeof useAudio>;
   onSelect: (a: Album) => void;
   onToggleFavorite: (id: string) => void;
 }) {
@@ -245,9 +248,12 @@ function ShelfRow({ title, albums, favorites, onSelect, onToggleFavorite }: {
               key={album.id}
               album={album}
               isFavorite={favorites.has(album.id)}
+              loadedCount={album.tracks.filter(t => audio.hasFile(`${album.id}-${t.id}`)).length}
+              totalTracks={album.tracks.length}
               delay={i * 0.05}
               onSelect={() => onSelect(album)}
               onToggleFavorite={() => onToggleFavorite(album.id)}
+              onLoadFiles={(files) => audio.loadFiles(files, album.id, album.tracks)}
             />
           ))}
         </div>
@@ -257,14 +263,28 @@ function ShelfRow({ title, albums, favorites, onSelect, onToggleFavorite }: {
   );
 }
 
-function SpineItem({ album, isFavorite, delay, onSelect, onToggleFavorite }: {
+function SpineItem({ album, isFavorite, loadedCount, totalTracks, delay, onSelect, onToggleFavorite, onLoadFiles }: {
   album: Album;
   isFavorite: boolean;
+  loadedCount: number;
+  totalTracks: number;
   delay: number;
   onSelect: () => void;
   onToggleFavorite: () => void;
+  onLoadFiles: (files: FileList) => number;
 }) {
   const [hovered, setHovered] = useState(false);
+  const [toast, setToast] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+  const allLoaded = loadedCount === totalTracks && totalTracks > 0;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const matched = onLoadFiles(e.target.files);
+    setToast(`+${matched}`);
+    setTimeout(() => setToast(''), 2000);
+    e.target.value = '';
+  };
 
   return (
     <div
@@ -281,7 +301,7 @@ function SpineItem({ album, isFavorite, delay, onSelect, onToggleFavorite }: {
           height: 112,
           background: album.spineColor,
           border: `1px solid rgba(212,168,67,0.15)`,
-          borderTop: `2px solid rgba(212,168,67,0.3)`,
+          borderTop: `2px solid ${allLoaded ? 'rgba(76,175,80,0.6)' : 'rgba(212,168,67,0.3)'}`,
           transform: hovered ? 'translateY(-14px)' : 'translateY(0)',
           boxShadow: hovered
             ? '3px 0 10px rgba(0,0,0,0.9), -1px 0 6px rgba(0,0,0,0.5), 0 -4px 8px rgba(212,168,67,0.1)'
@@ -297,15 +317,46 @@ function SpineItem({ album, isFavorite, delay, onSelect, onToggleFavorite }: {
           style={{ color: album.spineTextColor, maxHeight: 95, overflow: 'hidden' }}>
           {album.title} · {album.year}
         </div>
-        <div className="absolute bottom-1.5 left-0 right-0 flex justify-center">
-          <div style={{
-            width: 5, height: 5,
-            borderRadius: album.type === 'cd' ? '50%' : '0',
-            background: album.spineTextColor,
-            opacity: 0.4,
-          }} />
-        </div>
+        {/* loaded progress bar on spine */}
+        {loadedCount > 0 && (
+          <div className="absolute bottom-0 left-0 right-0" style={{ height: 2, background: 'rgba(0,0,0,0.4)' }}>
+            <div style={{
+              height: '100%',
+              width: `${(loadedCount / totalTracks) * 100}%`,
+              background: allLoaded ? '#4CAF50' : 'var(--amber)',
+              transition: 'width 0.4s ease',
+            }} />
+          </div>
+        )}
       </div>
+
+      {/* Upload button — appears on hover below the spine */}
+      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 z-20 transition-all duration-200"
+        style={{ opacity: hovered ? 1 : 0, pointerEvents: hovered ? 'auto' : 'none' }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}
+          title="Загрузить MP3"
+          className="flex items-center justify-center rounded-sm"
+          style={{
+            width: 22, height: 16,
+            background: allLoaded ? 'rgba(76,175,80,0.9)' : 'rgba(212,168,67,0.9)',
+            border: '1px solid rgba(0,0,0,0.4)',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+          }}>
+          <Icon name={allLoaded ? 'Check' : 'Upload'} size={9}
+            style={{ color: 'var(--wood-dark)' }} />
+        </button>
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-30 font-mono text-[9px] px-1 rounded-sm animate-fade-in"
+          style={{ background: '#4CAF50', color: '#fff', whiteSpace: 'nowrap' }}>
+          {toast}
+        </div>
+      )}
+
+      {/* Fav button */}
       {(isFavorite || hovered) && (
         <button
           onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
@@ -313,6 +364,8 @@ function SpineItem({ album, isFavorite, delay, onSelect, onToggleFavorite }: {
           <Icon name="Heart" size={10} style={{ color: isFavorite ? '#C0392B' : '#555' }} />
         </button>
       )}
+
+      <input ref={fileRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleFileChange} />
     </div>
   );
 }
