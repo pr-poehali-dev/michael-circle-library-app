@@ -4,7 +4,7 @@ import { albums, biography, type Album, type Track } from '@/data/albums';
 import Icon from '@/components/ui/icon';
 import { useAudio } from '@/hooks/useAudio';
 
-type Screen = 'shelf' | 'album' | 'player' | 'search' | 'history' | 'cdcenter';
+type Screen = 'shelf' | 'album' | 'player' | 'search' | 'history' | 'cdcenter' | 'tapecenter';
 type SortType = 'year' | 'type' | 'category';
 
 export default function App() {
@@ -84,6 +84,7 @@ export default function App() {
             {screen === 'search' && '⌕ ПОИСК'}
             {screen === 'history' && '✦ БИОГРАФИЯ'}
             {screen === 'cdcenter' && '◉ CD МП3-ЦЕНТР'}
+            {screen === 'tapecenter' && '◼ КАССЕТНЫЙ ЦЕНТР'}
           </div>
         </div>
         <div className="w-16 flex justify-end gap-2">
@@ -174,13 +175,23 @@ export default function App() {
         />
       )}
 
+      {screen === 'tapecenter' && (
+        <TapeCenterScreen
+          albums={albums.filter(a => a.type === 'cassette')}
+          audio={audio}
+          onSelectAlbum={openAlbum}
+          onPlayAlbum={(album) => openPlayer(album)}
+        />
+      )}
+
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-sm z-50"
         style={{ background: 'linear-gradient(0deg, #0f0a03 0%, #1a1008 100%)', borderTop: '1px solid var(--amber-dark)' }}>
         <div className="flex">
           {[
-            { id: 'shelf', icon: 'Library', label: 'СТЕЛЛАЖ' },
-            { id: 'cdcenter', icon: 'Disc3', label: 'CD ЦЕНТР' },
+            { id: 'shelf', icon: 'Library', label: 'ПОЛКА' },
+            { id: 'tapecenter', icon: 'Cassette', label: 'КАССЕТЫ' },
+            { id: 'cdcenter', icon: 'Disc3', label: 'CD' },
             { id: 'search', icon: 'Search', label: 'ПОИСК' },
             { id: 'history', icon: 'BookOpen', label: 'ИСТОРИЯ' },
           ].map(tab => (
@@ -1164,6 +1175,261 @@ function CDTrackList({ album, audio }: { album: Album; audio: ReturnType<typeof 
                   : <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(160,180,220,0.12)', flexShrink: 0 }} />
                 }
                 <span className="font-mono text-[10px] shrink-0" style={{ color: 'rgba(160,180,220,0.3)' }}>{t.duration}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TapeCenterScreen({ albums, audio, onSelectAlbum, onPlayAlbum }: {
+  albums: Album[];
+  audio: ReturnType<typeof useAudio>;
+  onSelectAlbum: (a: Album) => void;
+  onPlayAlbum: (a: Album) => void;
+}) {
+  const totalTracks = albums.reduce((s, a) => s + a.tracks.length, 0);
+  const loadedTracks = albums.reduce((s, a) =>
+    s + a.tracks.filter(t => audio.hasFile(`${a.id}-${t.id}`)).length, 0);
+  const overallPct = totalTracks ? Math.round((loadedTracks / totalTracks) * 100) : 0;
+
+  return (
+    <div className="pb-24 animate-fade-in">
+      {/* Header stats */}
+      <div className="px-4 py-4"
+        style={{ background: 'linear-gradient(180deg, var(--wood-mid) 0%, var(--tape-dark) 100%)', borderBottom: '1px solid rgba(212,168,67,0.2)' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="text-3xl">📼</div>
+          <div>
+            <div className="font-oswald font-bold text-base tracking-widest" style={{ color: 'var(--amber-light)' }}>
+              КАССЕТНЫЙ ЦЕНТР
+            </div>
+            <div className="font-mono text-xs" style={{ color: 'var(--amber-dark)' }}>
+              {albums.length} кассет · {totalTracks} треков
+            </div>
+          </div>
+          <div className="ml-auto text-right">
+            <div className="font-mono text-xl font-bold" style={{ color: overallPct === 100 ? '#4CAF50' : 'var(--amber-light)' }}>
+              {overallPct}%
+            </div>
+            <div className="font-mono text-[10px]" style={{ color: 'var(--amber-dark)' }}>
+              {loadedTracks}/{totalTracks}
+            </div>
+          </div>
+        </div>
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(212,168,67,0.1)' }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${overallPct}%`,
+              background: overallPct === 100
+                ? 'linear-gradient(90deg, #4CAF50, #8BC34A)'
+                : 'linear-gradient(90deg, var(--amber-dark), var(--amber-light))',
+            }} />
+        </div>
+      </div>
+
+      {/* Cassette list */}
+      <div className="px-4 py-3 space-y-3">
+        {albums.map((album, i) => (
+          <TapeCenterCard
+            key={album.id}
+            album={album}
+            audio={audio}
+            delay={i * 0.07}
+            onOpen={() => onSelectAlbum(album)}
+            onPlay={() => onPlayAlbum(album)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TapeCenterCard({ album, audio, delay, onOpen, onPlay }: {
+  album: Album;
+  audio: ReturnType<typeof useAudio>;
+  delay: number;
+  onOpen: () => void;
+  onPlay: () => void;
+}) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [toast, setToast] = useState('');
+  const [reelAngle, setReelAngle] = useState(0);
+  const loaded = album.tracks.filter(t => audio.hasFile(`${album.id}-${t.id}`)).length;
+  const total = album.tracks.length;
+  const pct = total ? Math.round((loaded / total) * 100) : 0;
+  const allLoaded = loaded === total;
+  const isCurrentlyPlaying = audio.isPlaying &&
+    album.tracks.some(t => audio.currentKey === `${album.id}-${t.id}`);
+
+  useEffect(() => {
+    if (!isCurrentlyPlaying) return;
+    const id = setInterval(() => setReelAngle(a => (a + 6) % 360), 50);
+    return () => clearInterval(id);
+  }, [isCurrentlyPlaying]);
+
+  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const matched = audio.loadFiles(e.target.files, album.id, album.tracks);
+    setToast(`✓ Добавлено ${matched} треков`);
+    setTimeout(() => setToast(''), 3000);
+    e.target.value = '';
+  };
+
+  return (
+    <div className="rounded-sm overflow-hidden animate-fade-in"
+      style={{
+        animationDelay: `${delay}s`,
+        animationFillMode: 'both',
+        background: 'linear-gradient(135deg, var(--tape-brown) 0%, var(--tape-dark) 100%)',
+        border: `1px solid ${allLoaded ? 'rgba(76,175,80,0.35)' : 'rgba(212,168,67,0.15)'}`,
+        boxShadow: allLoaded ? '0 0 12px rgba(76,175,80,0.08)' : '0 2px 8px rgba(0,0,0,0.5)',
+      }}>
+      <div className="flex items-center gap-3 p-3">
+        {/* Cassette mini art */}
+        <div className="relative shrink-0 cursor-pointer" onClick={onOpen}
+          style={{ width: 64, height: 40 }}>
+          {/* Case */}
+          <div className="absolute inset-0 rounded-sm"
+            style={{
+              background: `linear-gradient(135deg, ${album.coverColor} 0%, ${album.spineColor} 100%)`,
+              border: `1px solid ${allLoaded ? 'rgba(76,175,80,0.4)' : 'rgba(212,168,67,0.2)'}`,
+            }}>
+            {/* Window */}
+            <div className="absolute inset-x-2 top-1.5 bottom-2 rounded-sm flex items-center justify-between px-1.5"
+              style={{ background: 'rgba(0,0,0,0.7)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              {/* Left reel */}
+              <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#1A1008', border: '1px solid #333', position: 'relative', overflow: 'hidden' }}>
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: `conic-gradient(from ${reelAngle}deg, #2A1808 0deg, #3A2210 60deg, #1A0E04 120deg, #2A1808 180deg, #3A2210 240deg, #1A0E04 300deg)`,
+                }} />
+                <div style={{ position: 'absolute', inset: 3, borderRadius: '50%', background: '#0A0804' }} />
+              </div>
+              {/* Tape strip */}
+              <div style={{ flex: 1, height: 1.5, background: '#0A0400', margin: '0 2px' }} />
+              {/* Right reel */}
+              <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#1A1008', border: '1px solid #333', position: 'relative', overflow: 'hidden' }}>
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  background: `conic-gradient(from ${reelAngle + 30}deg, #1A0E04 0deg, #2A1808 60deg, #3A2210 120deg, #1A0E04 180deg, #2A1808 240deg, #3A2210 300deg)`,
+                }} />
+                <div style={{ position: 'absolute', inset: 3, borderRadius: '50%', background: '#0A0804' }} />
+              </div>
+            </div>
+          </div>
+          {allLoaded && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+              style={{ background: '#4CAF50', border: `1px solid ${album.spineColor}` }}>
+              <Icon name="Check" size={9} style={{ color: '#fff' }} />
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpen}>
+          <div className="font-oswald text-sm font-semibold tracking-wide truncate"
+            style={{ color: album.spineTextColor }}>
+            {album.title}
+          </div>
+          <div className="font-mono text-[10px] mb-1.5" style={{ color: 'var(--amber-dark)' }}>
+            {album.year} · {album.label} · {total} треков
+          </div>
+          <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(212,168,67,0.1)' }}>
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${pct}%`,
+                background: allLoaded
+                  ? 'linear-gradient(90deg, #4CAF50, #8BC34A)'
+                  : 'linear-gradient(90deg, var(--amber-dark), var(--amber))',
+              }} />
+          </div>
+          <div className="font-mono text-[9px] mt-0.5"
+            style={{ color: allLoaded ? '#4CAF50' : 'var(--amber-dark)' }}>
+            {allLoaded ? 'ВСЕ ТРЕКИ ЗАГРУЖЕНЫ' : `${loaded} / ${total} MP3`}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-col gap-1.5 shrink-0">
+          <button onClick={onPlay} disabled={loaded === 0}
+            className="flex items-center justify-center w-8 h-8 rounded-sm transition-all"
+            style={{
+              background: loaded > 0 ? 'var(--amber)' : 'rgba(212,168,67,0.06)',
+              border: `1px solid ${loaded > 0 ? 'var(--amber-light)' : 'rgba(212,168,67,0.1)'}`,
+              cursor: loaded > 0 ? 'pointer' : 'not-allowed',
+            }}>
+            <Icon name="Play" size={14}
+              style={{ color: loaded > 0 ? 'var(--wood-dark)' : 'rgba(212,168,67,0.2)' }} />
+          </button>
+          <button onClick={() => fileRef.current?.click()}
+            className="flex items-center justify-center w-8 h-8 rounded-sm transition-all"
+            style={{
+              background: allLoaded ? 'rgba(76,175,80,0.15)' : 'rgba(212,168,67,0.06)',
+              border: `1px solid ${allLoaded ? 'rgba(76,175,80,0.4)' : 'rgba(212,168,67,0.15)'}`,
+            }}>
+            <Icon name={allLoaded ? 'FolderCheck' : 'Upload'} size={14}
+              style={{ color: allLoaded ? '#4CAF50' : 'var(--amber-dark)' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Tracklist accordion */}
+      <TapeTrackList album={album} audio={audio} />
+
+      {toast && (
+        <div className="px-3 py-1.5 font-mono text-xs animate-fade-in"
+          style={{ background: 'rgba(76,175,80,0.1)', borderTop: '1px solid rgba(76,175,80,0.2)', color: '#4CAF50' }}>
+          {toast}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleFiles} />
+    </div>
+  );
+}
+
+function TapeTrackList({ album, audio }: { album: Album; audio: ReturnType<typeof useAudio> }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ borderTop: '1px solid rgba(212,168,67,0.08)' }}>
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-3 py-1.5">
+        <span className="font-mono text-[10px] tracking-widest" style={{ color: 'var(--amber-dark)' }}>
+          ТРЕКЛИСТ
+        </span>
+        <Icon name={open ? 'ChevronUp' : 'ChevronDown'} size={12}
+          style={{ color: 'var(--amber-dark)' }} />
+      </button>
+      {open && (
+        <div className="px-3 pb-2">
+          {album.tracks.map(t => {
+            const hasFile = audio.hasFile(`${album.id}-${t.id}`);
+            const isPlaying = audio.isPlaying && audio.currentKey === `${album.id}-${t.id}`;
+            return (
+              <div key={t.id} className="flex items-center gap-2 py-1"
+                style={{ borderBottom: '1px solid rgba(212,168,67,0.05)' }}>
+                <span className="font-mono text-[10px] w-5 shrink-0 text-right"
+                  style={{ color: 'var(--amber-dark)' }}>
+                  {isPlaying
+                    ? <span style={{ color: 'var(--amber-light)' }}>▶</span>
+                    : String(t.id).padStart(2, '0')
+                  }
+                </span>
+                <span className="flex-1 font-oswald text-xs truncate"
+                  style={{ color: isPlaying ? 'var(--amber-light)' : hasFile ? 'var(--cream)' : 'rgba(212,168,67,0.35)' }}>
+                  {t.title}
+                </span>
+                <div style={{
+                  width: 5, height: 5, borderRadius: '50%', flexShrink: 0,
+                  background: hasFile ? '#4CAF50' : 'rgba(212,168,67,0.1)',
+                  boxShadow: hasFile ? '0 0 4px #4CAF50' : 'none',
+                }} />
+                <span className="font-mono text-[10px] shrink-0" style={{ color: 'var(--amber-dark)' }}>
+                  {t.duration}
+                </span>
               </div>
             );
           })}
