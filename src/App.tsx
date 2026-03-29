@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+// useRef, useEffect used in PlayerScreen and VUMeter
 import { albums, biography, type Album, type Track } from '@/data/albums';
 import Icon from '@/components/ui/icon';
+import { useAudio } from '@/hooks/useAudio';
 
 type Screen = 'shelf' | 'album' | 'player' | 'search' | 'history';
 type SortType = 'year' | 'type' | 'category';
@@ -9,29 +11,12 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('shelf');
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sortBy, setSortBy] = useState<SortType>('year');
   const [searchQuery, setSearchQuery] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
-  const [trackProgress, setTrackProgress] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    if (isPlaying) {
-      intervalRef.current = setInterval(() => {
-        setTrackProgress(p => {
-          if (p >= 100) { setIsPlaying(false); return 0; }
-          return p + 0.1;
-        });
-        setCurrentTime(t => t + 0.1);
-      }, 100);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [isPlaying]);
+  const audio = useAudio();
 
   const openAlbum = (album: Album) => {
     setSelectedAlbum(album);
@@ -39,14 +24,16 @@ export default function App() {
     setScreen('album');
   };
 
-  const openPlayer = (album: Album, track?: Track) => {
+  const openPlayer = useCallback((album: Album, track?: Track) => {
+    const t = track || album.tracks[0];
     setSelectedAlbum(album);
-    setSelectedTrack(track || album.tracks[0]);
-    setIsPlaying(true);
-    setTrackProgress(0);
-    setCurrentTime(0);
+    setSelectedTrack(t);
     setScreen('player');
-  };
+    const key = `${album.id}-${t.id}`;
+    if (audio.hasFile(key)) {
+      audio.playTrack(key);
+    }
+  }, [audio]);
 
   const toggleFavorite = (id: string) => {
     setFavorites(prev => {
@@ -139,26 +126,23 @@ export default function App() {
         <PlayerScreen
           album={selectedAlbum}
           track={selectedTrack}
-          isPlaying={isPlaying}
-          progress={trackProgress}
-          currentTime={currentTime}
+          audio={audio}
           favorites={favorites}
-          onPlayPause={() => setIsPlaying(p => !p)}
           onNext={() => {
             const idx = selectedAlbum.tracks.findIndex(t => t.id === selectedTrack.id);
             const next = selectedAlbum.tracks[(idx + 1) % selectedAlbum.tracks.length];
             setSelectedTrack(next);
-            setTrackProgress(0);
-            setCurrentTime(0);
-            setIsPlaying(true);
+            const key = `${selectedAlbum.id}-${next.id}`;
+            if (audio.hasFile(key)) audio.playTrack(key);
+            else audio.pause();
           }}
           onPrev={() => {
             const idx = selectedAlbum.tracks.findIndex(t => t.id === selectedTrack.id);
             const prev = selectedAlbum.tracks[(idx - 1 + selectedAlbum.tracks.length) % selectedAlbum.tracks.length];
             setSelectedTrack(prev);
-            setTrackProgress(0);
-            setCurrentTime(0);
-            setIsPlaying(true);
+            const key = `${selectedAlbum.id}-${prev.id}`;
+            if (audio.hasFile(key)) audio.playTrack(key);
+            else audio.pause();
           }}
           onToggleFavorite={toggleFavorite}
         />
@@ -502,24 +486,51 @@ function TrackRow({ track, index, delay, isFavorite, onPlay, onToggleFavorite }:
   );
 }
 
-function PlayerScreen({ album, track, isPlaying, progress, currentTime, favorites, onPlayPause, onNext, onPrev, onToggleFavorite }: {
+function PlayerScreen({ album, track, audio, favorites, onNext, onPrev, onToggleFavorite }: {
   album: Album;
   track: Track;
-  isPlaying: boolean;
-  progress: number;
-  currentTime: number;
+  audio: ReturnType<typeof useAudio>;
   favorites: Set<string>;
-  onPlayPause: () => void;
   onNext: () => void;
   onPrev: () => void;
   onToggleFavorite: (id: string) => void;
 }) {
   const trackKey = `${album.id}-${track.id}`;
-  const totalSeconds = (parseInt(track.duration.split(':')[0]) * 60) + parseInt(track.duration.split(':')[1]);
-  const elapsed = Math.min(currentTime * 10, totalSeconds);
-  const elapsedMin = Math.floor(elapsed / 60);
-  const elapsedSec = Math.floor(elapsed % 60);
+  const hasFile = audio.hasFile(trackKey);
+  const isCurrentTrack = audio.currentKey === trackKey;
+  const isPlaying = isCurrentTrack && audio.isPlaying;
+  const progress = isCurrentTrack ? audio.progress : 0;
+  const currentTime = isCurrentTrack ? audio.currentTime : 0;
+  const duration = isCurrentTrack ? audio.duration : 0;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [loadMsg, setLoadMsg] = useState('');
   const vuHeights = [55, 70, 85, 95, 80, 60, 45, 65, 88, 72, 50, 60, 78, 90, 65];
+
+  const handleFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const matched = audio.loadFiles(e.target.files, album.id, album.tracks);
+    setLoadMsg(`Загружено: ${matched} из ${e.target.files.length} файлов`);
+    setTimeout(() => setLoadMsg(''), 3000);
+    e.target.value = '';
+  };
+
+  const handlePlayPause = () => {
+    if (!hasFile) { fileInputRef.current?.click(); return; }
+    audio.togglePlay(trackKey);
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isCurrentTrack || !audio.duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    audio.seek(pct);
+  };
+
+  const fmtTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  };
 
   return (
     <div className="pb-24 animate-fade-in">
@@ -528,15 +539,44 @@ function PlayerScreen({ album, track, isPlaying, progress, currentTime, favorite
         : <CDPlayer album={album} isPlaying={isPlaying} />
       }
 
+      {/* Upload banner */}
+      {!hasFile && (
+        <div className="mx-4 mb-3 px-3 py-2 flex items-center gap-2 rounded-sm"
+          style={{ background: 'rgba(212,168,67,0.08)', border: '1px dashed rgba(212,168,67,0.3)' }}>
+          <Icon name="FolderOpen" size={14} style={{ color: 'var(--amber-dark)', flexShrink: 0 }} />
+          <span className="font-mono text-xs flex-1" style={{ color: 'var(--amber-dark)' }}>
+            MP3 не загружен — нажми ▶ или загрузи файлы
+          </span>
+          <button onClick={() => fileInputRef.current?.click()}
+            className="font-mono text-xs px-2 py-1 rounded-sm"
+            style={{ background: 'var(--amber-dark)', color: 'var(--wood-dark)' }}>
+            ЗАГР.
+          </button>
+        </div>
+      )}
+      {loadMsg && (
+        <div className="mx-4 mb-3 px-3 py-1.5 rounded-sm font-mono text-xs text-center animate-fade-in"
+          style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.3)', color: '#4CAF50' }}>
+          ✓ {loadMsg}
+        </div>
+      )}
+
+      <input ref={fileInputRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleFiles} />
+
+      {/* LED display */}
       <div className="mx-4 mb-4">
         <div className="led-display rounded-sm p-3 overflow-hidden">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 rounded-full" style={{ background: isPlaying ? 'var(--green-led)' : '#333', boxShadow: isPlaying ? '0 0 6px var(--green-led)' : 'none', transition: 'all 0.3s' }} />
+            <div className="w-2 h-2 rounded-full" style={{
+              background: isPlaying ? 'var(--green-led)' : hasFile ? 'var(--amber-dark)' : '#333',
+              boxShadow: isPlaying ? '0 0 6px var(--green-led)' : 'none',
+              transition: 'all 0.3s',
+            }} />
             <div className="font-mono text-xs" style={{ color: 'var(--amber-dark)' }}>
               {album.type === 'cassette' ? '◼ TAPE' : '◉ CD'} · {album.year}
             </div>
             <div className="ml-auto font-mono text-xs" style={{ color: 'var(--amber-dark)' }}>
-              {String(elapsedMin).padStart(2, '0')}:{String(elapsedSec).padStart(2, '0')} / {track.duration}
+              {fmtTime(currentTime)} / {duration ? fmtTime(duration) : track.duration}
             </div>
           </div>
           <div className="overflow-hidden h-5">
@@ -545,34 +585,27 @@ function PlayerScreen({ album, track, isPlaying, progress, currentTime, favorite
               {String(track.id).padStart(2, '0')} · {track.title.toUpperCase()} · {album.title.toUpperCase()} · МИХАИЛ КРУГ ·&nbsp;&nbsp;&nbsp;
             </div>
           </div>
-          <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(212,168,67,0.15)' }}>
-            <div className="h-full transition-all duration-300 rounded-full"
+          {/* Seekable progress bar */}
+          <div className="mt-2 h-2 rounded-full overflow-hidden cursor-pointer"
+            style={{ background: 'rgba(212,168,67,0.15)' }}
+            onClick={handleSeek}>
+            <div className="h-full rounded-full transition-all duration-100"
               style={{ width: `${progress}%`, background: 'linear-gradient(90deg, var(--amber-dark), var(--amber-light))' }} />
           </div>
         </div>
       </div>
 
-      <div className="mx-4 mb-4 p-2 flex gap-1 items-end justify-center"
-        style={{ height: 52, background: '#050500', border: '1px solid #2a2800', borderRadius: 2 }}>
-        {vuHeights.map((h, i) => (
-          <div key={i} className="flex-1 flex items-end" style={{ height: '100%' }}>
-            <div className="w-full vu-bar rounded-sm"
-              style={{
-                height: isPlaying ? `${Math.min(100, h + (Math.sin(Date.now() / 200 + i) * 15))}%` : '8%',
-                transition: 'height 0.2s ease',
-              }}
-            />
-          </div>
-        ))}
-      </div>
+      {/* VU Meters */}
+      <VUMeter isPlaying={isPlaying} vuHeights={vuHeights} />
 
+      {/* Controls */}
       <div className="mx-4 p-4 rounded-sm"
         style={{ background: 'var(--metal)', border: '1px solid #6A6060', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -2px 4px rgba(0,0,0,0.3)' }}>
         <div className="flex items-center justify-between gap-2 mb-3">
           <button onClick={onPrev} className="retro-btn flex-1 flex items-center justify-center py-3 rounded-sm">
             <Icon name="SkipBack" size={16} />
           </button>
-          <button onClick={onPlayPause}
+          <button onClick={handlePlayPause}
             className="flex-[2] flex items-center justify-center py-3 rounded-sm font-oswald font-bold tracking-wider text-sm"
             style={{
               background: isPlaying
@@ -583,27 +616,56 @@ function PlayerScreen({ album, track, isPlaying, progress, currentTime, favorite
               boxShadow: '0 3px 6px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2)',
               transition: 'all 0.15s',
             }}>
-            <Icon name={isPlaying ? 'Pause' : 'Play'} size={22} />
+            {!hasFile
+              ? <Icon name="FolderOpen" size={20} />
+              : <Icon name={isPlaying ? 'Pause' : 'Play'} size={22} />
+            }
           </button>
           <button onClick={onNext} className="retro-btn flex-1 flex items-center justify-center py-3 rounded-sm">
             <Icon name="SkipForward" size={16} />
           </button>
         </div>
         <div className="flex gap-2 justify-center">
-          <button className="retro-btn px-3 py-1.5 text-xs rounded-sm flex items-center gap-1 font-oswald tracking-wide">
-            <Icon name="Rewind" size={10} />ПЕР.
+          <button onClick={() => audio.seek(Math.max(0, progress - 5))}
+            className="retro-btn px-3 py-1.5 text-xs rounded-sm flex items-center gap-1 font-oswald tracking-wide">
+            <Icon name="Rewind" size={10} />–5с
           </button>
-          <button className="retro-btn px-3 py-1.5 text-xs rounded-sm font-oswald tracking-wide">
+          <button onClick={() => audio.pause()}
+            className="retro-btn px-3 py-1.5 text-xs rounded-sm font-oswald tracking-wide">
             СТОП
           </button>
-          <button className="retro-btn px-3 py-1.5 text-xs rounded-sm flex items-center gap-1 font-oswald tracking-wide">
-            <Icon name="FastForward" size={10} />ПЕР.
+          <button onClick={() => audio.seek(Math.min(100, progress + 5))}
+            className="retro-btn px-3 py-1.5 text-xs rounded-sm flex items-center gap-1 font-oswald tracking-wide">
+            +5с<Icon name="FastForward" size={10} />
           </button>
           <button onClick={() => onToggleFavorite(trackKey)} className="retro-btn px-3 py-1.5 text-xs rounded-sm">
             <Icon name="Heart" size={12} style={{ color: favorites.has(trackKey) ? '#C0392B' : 'var(--wood-dark)' }} />
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function VUMeter({ isPlaying, vuHeights }: { isPlaying: boolean; vuHeights: number[] }) {
+  const [heights, setHeights] = useState(vuHeights.map(() => 8));
+
+  useEffect(() => {
+    if (!isPlaying) { setHeights(vuHeights.map(() => 8)); return; }
+    const interval = setInterval(() => {
+      setHeights(vuHeights.map(h => isPlaying ? Math.max(8, Math.min(100, h + (Math.random() - 0.4) * 30)) : 8));
+    }, 120);
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
+  return (
+    <div className="mx-4 mb-4 p-2 flex gap-1 items-end justify-center"
+      style={{ height: 52, background: '#050500', border: '1px solid #2a2800', borderRadius: 2 }}>
+      {heights.map((h, i) => (
+        <div key={i} className="flex-1 flex items-end" style={{ height: '100%' }}>
+          <div className="w-full vu-bar rounded-sm" style={{ height: `${h}%`, transition: 'height 0.12s ease' }} />
+        </div>
+      ))}
     </div>
   );
 }
